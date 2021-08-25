@@ -6,7 +6,7 @@ pub struct Inertia {
 }
 impl Inertia {
     pub fn step() -> f32 {
-        0.1
+        0.01
     }
 
     pub fn new(position: Point) -> Inertia {

@@ -11,15 +11,19 @@ pub struct Ship {
 impl Ship {
     pub fn new() -> Ship {
         let bottom = (
-            Inertia::new(Point(-1.0, 0.0)),
-            Inertia::new(Point(1.0, 0.0)),
+            Inertia::new(Point(-3.0, 0.0)),
+            Inertia::new(Point(3.0, 0.0)),
         );
         let top = Inertia::new(Point(0.0, 10.0));
         Ship { bottom, top }
     }
 
+    pub fn origin(&self) -> Point {
+        (self.bottom.0.position + self.bottom.1.position) * 0.5
+    }
+
     pub fn direction(&self) -> Vector {
-        let origin = (self.bottom.0.position + self.bottom.1.position) * 0.5;
+        let origin = self.origin();
         let dir1 = (self.top.position - origin).unit();
         let dir2 = (self.bottom.0.position - self.bottom.1.position)
             .unit()
@@ -48,7 +52,7 @@ impl Ship {
         self.top.position = center + (direction * 5.0);
         let bottom = center - (direction * 5.0);
         let direction = direction.rot90();
-        self.bottom.0.position = bottom - direction;
-        self.bottom.1.position = bottom + direction;
+        self.bottom.0.position = bottom - direction * 3.0;
+        self.bottom.1.position = bottom + direction * 3.0;
     }
 }

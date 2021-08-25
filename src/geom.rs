@@ -22,6 +22,14 @@ impl Point {
     pub fn unit(self) -> Point {
         self * (1.0 / self.len())
     }
+
+    pub fn sin(self) -> f32 {
+        self.1 / self.len()
+    }
+
+    pub fn cos(self) -> f32 {
+        self.0 / self.len()
+    }
 }
 impl std::ops::Add for Point {
     type Output = Point;
@@ -126,5 +134,75 @@ pub mod tests {
         let b = Line(Point(0.5, 0.0), Point(1.0, 0.0));
 
         assert_eq!(a.intersects(b), false);
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct Mat3((f32, f32, f32), (f32, f32, f32), (f32, f32, f32));
+impl Mat3 {
+    pub fn identity() -> Mat3 {
+        Mat3((1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0))
+    }
+
+    pub fn scale(sx: f32, sy: f32) -> Mat3 {
+        Mat3((sx, 0.0, 0.0), (0.0, sy, 0.0), (0.0, 0.0, 1.0))
+    }
+
+    pub fn scale_x(amount: f32) -> Mat3 {
+        Mat3((amount, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0))
+    }
+
+    pub fn scale_y(amount: f32) -> Mat3 {
+        Mat3((1.0, 0.0, 0.0), (0.0, amount, 0.0), (0.0, 0.0, 1.0))
+    }
+
+    pub fn rotate(angle: f32) -> Mat3 {
+        let s = angle.sin();
+        let c = angle.cos();
+
+        Mat3((c, -s, 0.0), (s, c, 0.0), (0.0, 0.0, 1.0))
+    }
+
+    pub fn rotate_y_to(direction: Vector) -> Mat3 {
+        let direction = direction.rot90();
+        let s = direction.sin();
+        let c = direction.cos();
+
+        Mat3((c, -s, 0.0), (s, c, 0.0), (0.0, 0.0, 1.0))
+    }
+
+    pub fn translate(tx: f32, ty: f32) -> Mat3 {
+        Mat3((1.0, 0.0, tx), (0.0, 1.0, ty), (0.0, 0.0, 1.0))
+    }
+
+    pub fn as_f32(&self) -> [f32; 12] {
+        [
+            self.0 .0, self.1 .0, self.2 .0, 0.0, self.0 .1, self.1 .1, self.2 .1, 0.0, self.0 .2,
+            self.1 .2, self.2 .2, 0.0,
+        ]
+    }
+}
+impl std::ops::Mul for Mat3 {
+    type Output = Mat3;
+
+    fn mul(self, rhs: Self) -> Self::Output {
+        let lhs = self;
+        Mat3(
+            (
+                lhs.0 .0 * rhs.0 .0 + lhs.0 .1 * rhs.1 .0 + lhs.0 .2 * rhs.2 .0,
+                lhs.0 .0 * rhs.0 .1 + lhs.0 .1 * rhs.1 .1 + lhs.0 .2 * rhs.2 .1,
+                lhs.0 .0 * rhs.0 .2 + lhs.0 .1 * rhs.1 .2 + lhs.0 .2 * rhs.2 .2,
+            ),
+            (
+                lhs.1 .0 * rhs.0 .0 + lhs.1 .1 * rhs.1 .0 + lhs.1 .2 * rhs.2 .0,
+                lhs.1 .0 * rhs.0 .1 + lhs.1 .1 * rhs.1 .1 + lhs.1 .2 * rhs.2 .1,
+                lhs.1 .0 * rhs.0 .2 + lhs.1 .1 * rhs.1 .2 + lhs.1 .2 * rhs.2 .2,
+            ),
+            (
+                lhs.2 .0 * rhs.0 .0 + lhs.2 .1 * rhs.1 .0 + lhs.2 .2 * rhs.2 .0,
+                lhs.2 .0 * rhs.0 .1 + lhs.2 .1 * rhs.1 .1 + lhs.2 .2 * rhs.2 .1,
+                lhs.2 .0 * rhs.0 .2 + lhs.2 .1 * rhs.1 .2 + lhs.2 .2 * rhs.2 .2,
+            ),
+        )
     }
 }
