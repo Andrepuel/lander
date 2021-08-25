@@ -1,21 +1,33 @@
+use std::collections::HashSet;
+
 use crate::{
     geom::{Point, Vector},
     inertia::Inertia,
 };
 
+#[derive(Debug, Hash, PartialEq, Eq)]
+pub enum Throttle {
+    Left,
+    Bottom,
+    Right,
+}
+
 #[derive(Debug)]
 pub struct Ship {
     bottom: (Inertia, Inertia),
     top: Inertia,
+    throttle: HashSet<Throttle>,
 }
 impl Ship {
     pub fn new() -> Ship {
-        let bottom = (
-            Inertia::new(Point(-3.0, 0.0)),
-            Inertia::new(Point(3.0, 0.0)),
-        );
-        let top = Inertia::new(Point(0.0, 10.0));
-        Ship { bottom, top }
+        Ship {
+            bottom: (
+                Inertia::new(Point(-3.0, 0.0)),
+                Inertia::new(Point(3.0, 0.0)),
+            ),
+            top: Inertia::new(Point(0.0, 10.0)),
+            throttle: Default::default(),
+        }
     }
 
     pub fn origin(&self) -> Point {
@@ -33,7 +45,20 @@ impl Ship {
 
     pub fn integrate(&mut self) {
         self.bottom.0.force(Self::gravity());
-        // self.top.force(Self::gravity());
+        self.bottom.1.force(Self::gravity());
+        self.top.force(Self::gravity());
+
+        if self.throttle.contains(&Throttle::Left) {
+            self.bottom.0.force(self.throttle_force());
+        }
+        if self.throttle.contains(&Throttle::Bottom) {
+            self.bottom.0.force(self.throttle_force());
+            self.bottom.1.force(self.throttle_force());
+        }
+        if self.throttle.contains(&Throttle::Right) {
+            self.bottom.1.force(self.throttle_force());
+        }
+
         self.bottom.0.integrate();
         self.bottom.1.integrate();
         self.top.integrate();
@@ -41,7 +66,12 @@ impl Ship {
     }
 
     fn gravity() -> Vector {
-        Point(0.0, -1.62)
+        Point(0.0, -0.32)
+    }
+
+    fn throttle_force(&self) -> Vector {
+        let force = Self::gravity().len() * 3.0;
+        self.direction() * force
     }
 
     fn fix_points_equidistance(&mut self) {
@@ -54,5 +84,25 @@ impl Ship {
         let direction = direction.rot90();
         self.bottom.0.position = bottom - direction * 3.0;
         self.bottom.1.position = bottom + direction * 3.0;
+    }
+
+    pub fn throttle(&mut self, throttle: Throttle, activate: bool) {
+        if activate {
+            self.throttle.insert(throttle);
+        } else {
+            self.throttle.remove(&throttle);
+        }
+    }
+
+    pub fn active_throttles(&self) -> Vec<i32> {
+        [
+            (Throttle::Left, -1),
+            (Throttle::Bottom, 0),
+            (Throttle::Right, 1),
+        ]
+        .iter()
+        .filter(|(x, _)| self.throttle.contains(x))
+        .map(|(_, pos)| *pos)
+        .collect()
     }
 }

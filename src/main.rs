@@ -3,11 +3,11 @@ use std::time::{Duration, Instant};
 use lander::{
     inertia::Inertia,
     render::{render_target::RenderTarget, scene::Scene},
-    ship::Ship,
+    ship::{Ship, Throttle},
 };
 use winit::{
     dpi::PhysicalSize,
-    event::{Event, WindowEvent},
+    event::{DeviceEvent, Event, KeyboardInput, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
 };
 
@@ -63,6 +63,7 @@ fn main() {
             }
             Event::RedrawRequested(_) => {
                 integration.integrate(&mut ship);
+                scene.set_throttles(&ship.active_throttles());
                 scene.set_position(ship.origin(), ship.direction());
                 target.render_one(&mut scene);
             }
@@ -71,6 +72,29 @@ fn main() {
                 ..
             } => {
                 *control_flow = ControlFlow::Exit;
+            }
+            Event::DeviceEvent {
+                event:
+                    DeviceEvent::Key(KeyboardInput {
+                        virtual_keycode: Some(keycode),
+                        state,
+                        ..
+                    }),
+                ..
+            } => {
+                let activate = match state {
+                    winit::event::ElementState::Pressed => true,
+                    winit::event::ElementState::Released => false,
+                };
+                let throttle = match keycode {
+                    winit::event::VirtualKeyCode::Left => Some(Throttle::Left),
+                    winit::event::VirtualKeyCode::Up => Some(Throttle::Bottom),
+                    winit::event::VirtualKeyCode::Right => Some(Throttle::Right),
+                    _ => None,
+                };
+                if let Some(throttle) = throttle {
+                    ship.throttle(throttle, activate);
+                }
             }
             _ => {}
         }
