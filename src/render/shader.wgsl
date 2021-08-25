@@ -13,13 +13,12 @@ var transform: Transform;
 fn vs_main([[builtin(vertex_index)]] idx: u32) -> Pos {
     var pos: vec3<f32> = vec3<f32>(0.0, 0.0, 1.0);
 
-    if (idx > 0u && idx < 3u) {
-        pos.y = 0.0;
+    if (idx == 1u) {
+        pos.y = 1.0;
     } else {
-        pos.y = 10.0;
+        pos.y = 0.0;
     }
-    pos.x = (f32((idx+1u)%3u)) - 1.0;
-    pos.x = pos.x * 3.0;
+    pos.x = f32(idx) - 1.0;
 
     pos = transform.matrix * pos;
     var out: Pos;

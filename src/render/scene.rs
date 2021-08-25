@@ -44,7 +44,7 @@ impl Scene {
     }
 
     fn ship_bind_group(&self, device: &wgpu::Device) -> wgpu::BindGroup {
-        let transform = self.position;
+        let transform = self.position * Mat3::scale(3.0, 10.0);
 
         self.triangle_bind_group(device, transform)
     }
@@ -59,8 +59,7 @@ impl Scene {
                 let throttle_size = (between.sample(&mut rng) as f32) / 100.0;
                 let transform = self.position
                     * Mat3::translate((*pos as f32) * 3.0, 0.0)
-                    * Mat3::scale(1.0, throttle_size)
-                    * Mat3::scale(1.0 / 6.0, -1.0 / 10.0);
+                    * Mat3::scale(0.5, -throttle_size);
 
                 self.triangle_bind_group(device, transform)
             })
@@ -113,8 +112,8 @@ impl RenderScene for Scene {
                 targets: &[target_format.into()],
             }),
             primitive: wgpu::PrimitiveState {
-                topology: wgpu::PrimitiveTopology::LineStrip,
-                polygon_mode: wgpu::PolygonMode::Line,
+                topology: wgpu::PrimitiveTopology::TriangleList,
+                polygon_mode: wgpu::PolygonMode::Fill,
                 ..wgpu::PrimitiveState::default()
             },
             depth_stencil: None,
@@ -156,7 +155,7 @@ impl RenderScene for Scene {
             rpass.draw(0..4, 0..1);
             throttles.iter().for_each(|bind| {
                 rpass.set_bind_group(0, &bind, &[]);
-                rpass.draw(0..4, 0..1);
+                rpass.draw(0..3, 0..1);
             });
         }
 

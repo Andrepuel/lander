@@ -14,7 +14,7 @@ impl RenderTarget {
     }
 
     pub async fn new_async<T: HasRawWindowHandle>(window: &T) -> RenderTarget {
-        let instance = wgpu::Instance::new(wgpu::BackendBit::VULKAN);
+        let instance = wgpu::Instance::new(wgpu::BackendBit::all());
         let size = (1, 1);
         let surface = unsafe { instance.create_surface(window) };
         let adapter = instance
@@ -30,7 +30,7 @@ impl RenderTarget {
             .request_device(
                 &wgpu::DeviceDescriptor {
                     label: None,
-                    features: wgpu::Features::NON_FILL_POLYGON_MODE,
+                    features: wgpu::Features::empty(),
                     limits: wgpu::Limits::default(),
                 },
                 None,
