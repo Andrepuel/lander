@@ -75,7 +75,7 @@ fn main() {
                 let ground = ground.0 + ground.direction() * (origin - ground.0).0;
                 let distance = (origin - ground).len() + 30.0;
                 let zoom = (1.0 / distance).min(0.02);
-                let zoom = zoom * 0.01 + prev_zoom * 0.99;
+                let zoom = zoom * 0.05 + prev_zoom * 0.95;
                 prev_zoom = zoom;
 
                 integration.integrate(&mut ship, &mut land);

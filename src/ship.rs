@@ -1,7 +1,5 @@
 use std::collections::HashSet;
 
-use rand::prelude::Distribution;
-
 use crate::{
     geom::{Line, Point, Vector},
     inertia::Inertia,
@@ -121,94 +119,86 @@ impl Ship {
 }
 
 pub struct Land {
-    heights: Vec<Point>,
+    center: Point,
+    radius: f32,
 }
 impl Land {
     pub fn new() -> Land {
         Land {
-            heights: vec![Point(-15.0, -30.0), Point(15.0, -30.0)],
+            center: Point(0.0, -1000.0),
+            radius: 1000.0,
         }
     }
 
     pub fn apply_gravity(&mut self, point: &mut Inertia) {
-        point.force(Ship::gravity());
+        let force = Ship::gravity().len();
+        let direction = (self.center - point.position).unit();
+        point.force(direction * force);
     }
 
     pub fn handle_collision(&mut self, pos: &mut Point) {
-        let ground_line = self.get(*pos);
-        let ground_hit = ground_line.projection(*pos);
-        if pos.1 < ground_hit.1 {
-            *pos = ground_hit;
+        let direction = *pos - self.center;
+        let distance = direction.len();
+        if distance < self.radius {
+            *pos = self.center + direction.unit() * self.radius;
         }
     }
 
     pub fn get(&mut self, pos: Point) -> Line {
-        let x = pos.0;
-        self.expand_min(x - 500.0);
-        self.expand_max(x + 500.0);
-        self.shrink_min(x - 800.0);
-        self.shrink_max(x + 800.0);
+        let direction = pos - self.center;
+        let intersect = self.center + direction.unit() * self.radius;
 
-        let points = Self::binary_search(&self.heights, x);
-        Line(points[0], points[1])
+        Line(intersect, intersect + Point(1.0, 1.0))
     }
 
     pub fn all(&self) -> impl Iterator<Item = Line> + '_ {
-        (1..self.heights.len()).map(move |idx| Line(self.heights[idx - 1], self.heights[idx]))
+        (0..361)
+            .map(move |angle| {
+                let angle = (angle as f32) / 180.0 * std::f32::consts::PI;
+                Point(angle.cos(), angle.sin()) * self.radius + self.center
+            })
+            .two_items()
+            .map(|x| Line(x.0, x.1))
     }
+}
 
-    fn expand_min(&mut self, min: f32) {
-        while self.heights[0].0 > min {
-            let mut new_height = Self::new_height();
-            new_height.0 = self.heights[0].0 - new_height.0;
-            new_height.1 = self.heights[0].1 + new_height.1;
-            self.heights.insert(0, new_height);
+struct TwoItems<T: Iterator>(T, Option<T::Item>, Option<T::Item>)
+where
+    T::Item: Copy;
+impl<T: Iterator> TwoItems<T>
+where
+    T::Item: Copy,
+{
+    fn new(it: T) -> TwoItems<T> {
+        TwoItems(it, None, None)
+    }
+}
+impl<T: Iterator> Iterator for TwoItems<T>
+where
+    T::Item: Copy,
+{
+    type Item = (T::Item, T::Item);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let under = self.0.next();
+        self.2 = self.1;
+        self.1 = under;
+        match self.1 {
+            Some(a) => match self.2 {
+                Some(b) => Some((a, b)),
+                None => self.next(),
+            },
+            None => None,
         }
     }
+}
 
-    fn expand_max(&mut self, max: f32) {
-        while self.heights.last().unwrap().0 < max {
-            let mut new_height = Self::new_height();
-            new_height.0 = self.heights.last().unwrap().0 + new_height.0;
-            new_height.1 = self.heights.last().unwrap().1 + new_height.1;
-            self.heights.push(new_height);
-        }
-    }
-
-    fn shrink_min(&mut self, min: f32) {
-        while self.heights[0].0 < min {
-            self.heights.remove(0);
-        }
-    }
-
-    fn shrink_max(&mut self, max: f32) {
-        while self.heights.last().unwrap().0 > max {
-            self.heights.pop();
-        }
-    }
-
-    fn new_height() -> Point {
-        let mut rng = rand::thread_rng();
-        let x_between = rand::distributions::Uniform::from(1000..3000);
-        let y_between = rand::distributions::Uniform::from(-3000..3000);
-
-        Point(
-            (x_between.sample(&mut rng) as f32) / 100.0,
-            (y_between.sample(&mut rng) as f32) / 100.0,
-        )
-    }
-
-    fn binary_search(heights: &[Point], x: f32) -> &[Point] {
-        if heights.len() == 2 {
-            return heights;
-        }
-        assert!(heights.len() > 2);
-        let middle_idx = heights.len() / 2;
-        let middle = heights[middle_idx].0;
-        if middle < x {
-            Self::binary_search(&heights[middle_idx..], x)
-        } else {
-            Self::binary_search(&heights[0..(middle_idx + 1)], x)
-        }
+impl<T: Iterator> TwoItemsEx for T where T::Item: Copy {}
+trait TwoItemsEx: Iterator + Sized
+where
+    Self::Item: Copy,
+{
+    fn two_items(self) -> TwoItems<Self> {
+        TwoItems::new(self)
     }
 }

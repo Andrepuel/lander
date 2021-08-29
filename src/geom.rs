@@ -62,7 +62,7 @@ impl std::fmt::Debug for Point {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct Line(pub Point, pub Point);
 impl Line {
     pub fn intersects(self, rhs: Line) -> bool {
