@@ -3,6 +3,10 @@ pub type Vector = Point;
 #[derive(Clone, Copy)]
 pub struct Point(pub f32, pub f32);
 impl Point {
+    pub fn dot(self, rhs: Point) -> f32 {
+        self.0 * rhs.0 + self.1 * rhs.1
+    }
+
     pub fn dot_div(self, rhs: Point) -> Point {
         Point(self.0 / rhs.0, self.1 / rhs.1)
     }
@@ -82,6 +86,25 @@ impl Line {
 
         (t >= 0.0 && t <= 1.0 && u >= 0.0 && u <= 1.0)
             || (t_dividend == 0.0 && t_divisor == 0.0 && u_dividend == 0.0 && u_divisor == 0.0)
+    }
+
+    pub fn len(self) -> f32 {
+        (self.1 - self.0).len()
+    }
+
+    pub fn center(self) -> Point {
+        (self.0 + self.1) * 0.5
+    }
+
+    pub fn direction(self) -> Vector {
+        (self.1 - self.0).unit()
+    }
+
+    pub fn projection(self, point: Point) -> Point {
+        let direction = self.direction();
+        let point = point - self.0;
+
+        direction * point.dot(direction) + self.0
     }
 
     fn colinear_intersect(self, rhs: Line) -> bool {

@@ -3,27 +3,34 @@ use std::borrow::Cow;
 use rand::prelude::Distribution;
 use wgpu::util::DeviceExt;
 
-use crate::geom::{Mat3, Point, Vector};
+use crate::geom::{Line, Mat3, Point, Vector};
 
 use super::render_target::RenderScene;
 
 pub struct Scene {
     render_pipeline: wgpu::RenderPipeline,
     bind_group_layout: wgpu::BindGroupLayout,
+    camera: Mat3,
     position: Mat3,
     throttles: Vec<i32>,
+    land: Vec<Line>,
 }
 impl Scene {
     pub fn set_position(&mut self, bottom: Point, direction: Vector) {
-        self.position = Mat3::translate(bottom.0, bottom.1) * Mat3::rotate_y_to(direction)
+        self.position = Mat3::translate(bottom.0, bottom.1) * Mat3::rotate_y_to(direction);
+        self.camera = Mat3::scale(0.02, 0.02) * Mat3::translate(-bottom.0, -bottom.1);
     }
 
     pub fn set_throttles(&mut self, throttles: &[i32]) {
         self.throttles = throttles.to_owned();
     }
 
+    pub fn set_land<L: Iterator<Item = Line>>(&mut self, land: L) {
+        self.land = land.map(|x| x).collect();
+    }
+
     fn triangle_bind_group(&self, device: &wgpu::Device, transform: Mat3) -> wgpu::BindGroup {
-        let transform = Mat3::scale(0.02, 0.02) * transform;
+        let transform = self.camera * transform;
 
         let uniform_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Uniform Buffer"),
@@ -49,21 +56,37 @@ impl Scene {
         self.triangle_bind_group(device, transform)
     }
 
-    fn throttles_bind_group(&self, device: &wgpu::Device) -> Vec<wgpu::BindGroup> {
+    fn throttles_bind_group<'a>(
+        &'a self,
+        device: &'a wgpu::Device,
+    ) -> impl Iterator<Item = wgpu::BindGroup> + 'a {
         let mut rng = rand::thread_rng();
         let between = rand::distributions::Uniform::from(100..300);
 
-        self.throttles
-            .iter()
-            .map(|pos| {
-                let throttle_size = (between.sample(&mut rng) as f32) / 100.0;
-                let transform = self.position
-                    * Mat3::translate((*pos as f32) * 3.0, 0.0)
-                    * Mat3::scale(0.5, -throttle_size);
+        self.throttles.iter().map(move |pos| {
+            let throttle_size = (between.sample(&mut rng) as f32) / 100.0;
+            let transform = self.position
+                * Mat3::translate((*pos as f32) * 3.0, 0.0)
+                * Mat3::scale(0.5, -throttle_size);
 
-                self.triangle_bind_group(device, transform)
-            })
-            .collect()
+            self.triangle_bind_group(device, transform)
+        })
+    }
+
+    fn ground_bind_groups<'a>(
+        &'a self,
+        device: &'a wgpu::Device,
+    ) -> impl Iterator<Item = wgpu::BindGroup> + 'a {
+        self.land.iter().map(move |line| {
+            let pos = line.center();
+            let direction = line.direction().rot90() * -1.0;
+
+            let transform = Mat3::translate(pos.0, pos.1)
+                * Mat3::rotate_y_to(direction)
+                * Mat3::scale(line.len() * 0.52, -1.0);
+
+            self.triangle_bind_group(device, transform)
+        })
     }
 }
 impl RenderScene for Scene {
@@ -123,8 +146,10 @@ impl RenderScene for Scene {
         Scene {
             render_pipeline,
             bind_group_layout,
+            camera: Mat3::identity(),
             position: Mat3::identity(),
             throttles: vec![-1],
+            land: vec![],
         }
     }
 
@@ -133,8 +158,9 @@ impl RenderScene for Scene {
             device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
 
         {
-            let ship = self.ship_bind_group(device);
-            let throttles = self.throttles_bind_group(device);
+            let mut triangles = vec![self.ship_bind_group(device)];
+            triangles.extend(self.throttles_bind_group(device));
+            triangles.extend(self.ground_bind_groups(device));
 
             let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: None,
@@ -151,9 +177,7 @@ impl RenderScene for Scene {
 
             rpass.set_pipeline(&self.render_pipeline);
 
-            rpass.set_bind_group(0, &ship, &[]);
-            rpass.draw(0..4, 0..1);
-            throttles.iter().for_each(|bind| {
+            triangles.iter().for_each(|bind| {
                 rpass.set_bind_group(0, &bind, &[]);
                 rpass.draw(0..3, 0..1);
             });

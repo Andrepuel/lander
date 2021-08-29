@@ -3,7 +3,7 @@ use std::time::{Duration, Instant};
 use lander::{
     inertia::Inertia,
     render::{render_target::RenderTarget, scene::Scene},
-    ship::{Ship, Throttle},
+    ship::{Land, Ship, Throttle},
 };
 use winit::{
     dpi::PhysicalSize,
@@ -25,9 +25,9 @@ impl IntegrationController {
         Duration::from_millis((Inertia::step() * 1000.0) as u64)
     }
 
-    fn integrate(&mut self, ship: &mut Ship) {
+    fn integrate(&mut self, ship: &mut Ship, land: &mut Land) {
         while self.clock < Instant::now() {
-            ship.integrate();
+            ship.integrate(land);
             self.clock += Self::step();
         }
     }
@@ -49,11 +49,11 @@ fn main() {
     let mut target = RenderTarget::new(&window);
     let mut scene: Scene = target.new_scene();
     let mut ship = Ship::new();
+    let mut land = Land::new();
     let mut integration = IntegrationController::new();
 
     event_loop.run(move |event, _loop_target, control_flow| {
         *control_flow = ControlFlow::WaitUntil(Instant::now() + Duration::from_millis(33));
-        window.request_redraw();
         match event {
             Event::WindowEvent {
                 event: WindowEvent::Resized(size),
@@ -62,9 +62,11 @@ fn main() {
                 target.resize(size.width, size.height);
             }
             Event::RedrawRequested(_) => {
-                integration.integrate(&mut ship);
+                integration.integrate(&mut ship, &mut land);
+                land.get(ship.origin().0);
                 scene.set_throttles(&ship.active_throttles());
                 scene.set_position(ship.origin(), ship.direction());
+                scene.set_land(land.all());
                 target.render_one(&mut scene);
             }
             Event::WindowEvent {
@@ -95,6 +97,9 @@ fn main() {
                 if let Some(throttle) = throttle {
                     ship.throttle(throttle, activate);
                 }
+            }
+            Event::NewEvents(_) => {
+                window.request_redraw();
             }
             _ => {}
         }
