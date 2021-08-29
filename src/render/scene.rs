@@ -18,7 +18,16 @@ pub struct Scene {
 impl Scene {
     pub fn set_position(&mut self, bottom: Point, direction: Vector) {
         self.position = Mat3::translate(bottom.0, bottom.1) * Mat3::rotate_y_to(direction);
-        self.camera = Mat3::scale(0.02, 0.02) * Mat3::translate(-bottom.0, -bottom.1);
+        self.camera = Mat3::translate(-bottom.0, -bottom.1);
+    }
+
+    pub fn set_zoom(&mut self, scale: f32) {
+        self.camera = Mat3::scale(scale, scale) * self.camera;
+    }
+
+    pub fn set_window_size(&mut self, width: u32, height: u32) {
+        let aspect = (height as f32) / (width as f32);
+        self.camera = Mat3::scale(aspect, 1.0) * self.camera;
     }
 
     pub fn set_throttles(&mut self, throttles: &[i32]) {

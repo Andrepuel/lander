@@ -25,11 +25,13 @@ impl IntegrationController {
         Duration::from_millis((Inertia::step() * 1000.0) as u64)
     }
 
-    fn integrate(&mut self, ship: &mut Ship, land: &mut Land) {
-        while self.clock < Instant::now() {
+    fn integrate(&mut self, ship: &mut Ship, land: &mut Land) -> bool {
+        let now = Instant::now();
+        while self.clock < now {
             ship.integrate(land);
             self.clock += Self::step();
         }
+        true
     }
 }
 
@@ -51,6 +53,11 @@ fn main() {
     let mut ship = Ship::new();
     let mut land = Land::new();
     let mut integration = IntegrationController::new();
+    let mut window_size = PhysicalSize {
+        width: 1,
+        height: 1,
+    };
+    let mut prev_zoom = 0.0002;
 
     event_loop.run(move |event, _loop_target, control_flow| {
         *control_flow = ControlFlow::WaitUntil(Instant::now() + Duration::from_millis(33));
@@ -59,13 +66,23 @@ fn main() {
                 event: WindowEvent::Resized(size),
                 ..
             } => {
+                window_size = size;
                 target.resize(size.width, size.height);
             }
             Event::RedrawRequested(_) => {
+                let origin = ship.origin();
+                let ground = land.get(origin.0);
+                let ground = ground.0 + ground.direction() * (origin - ground.0).0;
+                let distance = (origin - ground).len() + 30.0;
+                let zoom = (1.0 / distance).min(0.02);
+                let zoom = zoom * 0.01 + prev_zoom * 0.99;
+                prev_zoom = zoom;
+
                 integration.integrate(&mut ship, &mut land);
-                land.get(ship.origin().0);
                 scene.set_throttles(&ship.active_throttles());
                 scene.set_position(ship.origin(), ship.direction());
+                scene.set_zoom(zoom);
+                scene.set_window_size(window_size.width, window_size.height);
                 scene.set_land(land.all());
                 target.render_one(&mut scene);
             }

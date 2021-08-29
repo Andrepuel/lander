@@ -135,10 +135,10 @@ impl Land {
     }
 
     pub fn get(&mut self, x: f32) -> Line {
-        self.expand_min(x - 200.0);
-        self.expand_max(x + 200.0);
-        self.shrink_min(x - 400.0);
-        self.shrink_max(x + 400.0);
+        self.expand_min(x - 500.0);
+        self.expand_max(x + 500.0);
+        self.shrink_min(x - 800.0);
+        self.shrink_max(x + 800.0);
 
         let points = Self::binary_search(&self.heights, x);
         Line(points[0], points[1])
