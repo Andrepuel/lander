@@ -71,7 +71,7 @@ fn main() {
             }
             Event::RedrawRequested(_) => {
                 let origin = ship.origin();
-                let ground = land.get(origin.0);
+                let ground = land.get(origin);
                 let ground = ground.0 + ground.direction() * (origin - ground.0).0;
                 let distance = (origin - ground).len() + 30.0;
                 let zoom = (1.0 / distance).min(0.02);

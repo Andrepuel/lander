@@ -95,11 +95,7 @@ impl Ship {
 
     fn ground_collision(&mut self, land: &mut Land) {
         self.all_points().for_each(|point| {
-            let ground_line = land.get(point.position.0);
-            let ground_hit = ground_line.projection(point.position);
-            if point.position.1 < ground_hit.1 {
-                point.position = ground_hit;
-            }
+            land.handle_collision(&mut point.position);
         });
     }
 
@@ -134,7 +130,16 @@ impl Land {
         }
     }
 
-    pub fn get(&mut self, x: f32) -> Line {
+    pub fn handle_collision(&mut self, pos: &mut Point) {
+        let ground_line = self.get(*pos);
+        let ground_hit = ground_line.projection(*pos);
+        if pos.1 < ground_hit.1 {
+            *pos = ground_hit;
+        }
+    }
+
+    pub fn get(&mut self, pos: Point) -> Line {
+        let x = pos.0;
         self.expand_min(x - 500.0);
         self.expand_max(x + 500.0);
         self.shrink_min(x - 800.0);
