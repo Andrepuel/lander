@@ -46,9 +46,9 @@ impl Ship {
     }
 
     pub fn integrate(&mut self, land: &mut Land) {
-        self.bottom.0.force(Self::gravity());
-        self.bottom.1.force(Self::gravity());
-        self.top.force(Self::gravity());
+        self.all_points().for_each(|point| {
+            land.apply_gravity(point);
+        });
 
         if self.throttle.contains(&Throttle::Left) {
             self.bottom.0.force(self.throttle_force());
@@ -128,6 +128,10 @@ impl Land {
         Land {
             heights: vec![Point(-15.0, -30.0), Point(15.0, -30.0)],
         }
+    }
+
+    pub fn apply_gravity(&mut self, point: &mut Inertia) {
+        point.force(Ship::gravity());
     }
 
     pub fn handle_collision(&mut self, pos: &mut Point) {
