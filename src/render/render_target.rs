@@ -1,9 +1,9 @@
 use raw_window_handle::HasRawWindowHandle;
+use wgpu::TextureViewDescriptor;
 
 pub struct RenderTarget {
     device: wgpu::Device,
-    sc_desc: wgpu::SwapChainDescriptor,
-    swap_chain: wgpu::SwapChain,
+    sc_desc: wgpu::SurfaceConfiguration,
     swapchain_format: wgpu::TextureFormat,
     queue: wgpu::Queue,
     surface: wgpu::Surface,
@@ -14,7 +14,7 @@ impl RenderTarget {
     }
 
     pub async fn new_async<T: HasRawWindowHandle>(window: &T) -> RenderTarget {
-        let instance = wgpu::Instance::new(wgpu::BackendBit::all());
+        let instance = wgpu::Instance::new(wgpu::Backends::all());
         let size = (1, 1);
         let surface = unsafe { instance.create_surface(window) };
         let adapter = instance
@@ -38,22 +38,21 @@ impl RenderTarget {
             .await
             .expect("Failed to create device");
 
-        let swapchain_format = adapter.get_swap_chain_preferred_format(&surface).unwrap();
+        let swapchain_format = surface.get_preferred_format(&adapter).unwrap();
 
-        let sc_desc = wgpu::SwapChainDescriptor {
-            usage: wgpu::TextureUsage::RENDER_ATTACHMENT,
+        let sc_desc = wgpu::SurfaceConfiguration {
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             format: swapchain_format,
             width: size.0,
             height: size.1,
             present_mode: wgpu::PresentMode::Mailbox,
         };
 
-        let swap_chain = device.create_swap_chain(&surface, &sc_desc);
+        surface.configure(&device, &sc_desc);
 
         RenderTarget {
             device,
             sc_desc,
-            swap_chain,
             swapchain_format,
             queue,
             surface,
@@ -63,17 +62,21 @@ impl RenderTarget {
     pub fn resize(&mut self, width: u32, height: u32) {
         self.sc_desc.width = width;
         self.sc_desc.height = height;
-        self.swap_chain = self.device.create_swap_chain(&self.surface, &self.sc_desc);
+        self.surface.configure(&self.device, &self.sc_desc);
     }
 
     pub fn render_one<R: RenderScene>(&mut self, scene: &mut R) {
         let frame = self
-            .swap_chain
+            .surface
             .get_current_frame()
             .expect("Failed to acquire next swap chain texture")
             .output;
 
-        scene.render_one(&self.device, &self.queue, &frame.view);
+        scene.render_one(
+            &self.device,
+            &self.queue,
+            &frame.texture.create_view(&TextureViewDescriptor::default()),
+        );
     }
 
     pub fn new_scene<R: RenderScene>(&mut self) -> R {
