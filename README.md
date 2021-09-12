@@ -21,3 +21,8 @@ Compiling
 The desktop version runs over Wgpu. The binary project is on the subfolder `bin` and may be launched quickly by running the following command:
 
     cargo run --manifest-path bin/Cargo.toml
+
+### Wasm version
+Run the NPM scripts to invoke the build:
+
+    npm run build:dev
