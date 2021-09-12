@@ -1,15 +1,13 @@
-use std::borrow::Cow;
-
 use rand::prelude::Distribution;
-use wgpu::util::DeviceExt;
+use web_sys::{WebGl2RenderingContext, WebGlProgram, WebGlShader, WebGlUniformLocation};
 
 use crate::geom::{Line, Mat3, Point, Vector};
 
 use super::render_target::RenderScene;
 
 pub struct Scene {
-    render_pipeline: wgpu::RenderPipeline,
-    bind_group_layout: wgpu::BindGroupLayout,
+    program: WebGlProgram,
+    uniform: WebGlUniformLocation,
     camera: Mat3,
     position: Mat3,
     throttles: Vec<i32>,
@@ -38,37 +36,28 @@ impl Scene {
         self.land = land.map(|x| x).collect();
     }
 
-    fn triangle_bind_group(&self, device: &wgpu::Device, transform: Mat3) -> wgpu::BindGroup {
+    fn triangle_uniform(&self, transform: Mat3, context: &WebGl2RenderingContext) {
         let transform = self.camera * transform;
-
-        let uniform_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Uniform Buffer"),
-            contents: to_u8(&transform.as_f32()),
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-        });
-
-        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            layout: &self.bind_group_layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: uniform_buf.as_entire_binding(),
-            }],
-            label: None,
-        });
-
-        bind_group
+        let transform = Mat3::scale_y(-1.0) * transform;
+        let data = transform.as_f32_packed();
+        context.uniform_matrix3fv_with_f32_array(Some(&self.uniform), false, &data);
     }
 
-    fn ship_bind_group(&self, device: &wgpu::Device) -> wgpu::BindGroup {
+    fn ship_uniform<'a>(
+        &'a self,
+        context: &'a WebGl2RenderingContext,
+    ) -> impl Iterator<Item = ()> + 'a {
         let transform = self.position * Mat3::scale(3.0, 10.0);
 
-        self.triangle_bind_group(device, transform)
+        (0..1)
+            .into_iter()
+            .map(move |_| self.triangle_uniform(transform, context))
     }
 
-    fn throttles_bind_group<'a>(
+    fn throttles_uniform<'a>(
         &'a self,
-        device: &'a wgpu::Device,
-    ) -> impl Iterator<Item = wgpu::BindGroup> + 'a {
+        context: &'a WebGl2RenderingContext,
+    ) -> impl Iterator<Item = ()> + 'a {
         let mut rng = rand::thread_rng();
         let between = rand::distributions::Uniform::from(100..300);
 
@@ -78,14 +67,14 @@ impl Scene {
                 * Mat3::translate((*pos as f32) * 3.0, 0.0)
                 * Mat3::scale(0.5, -throttle_size);
 
-            self.triangle_bind_group(device, transform)
+            self.triangle_uniform(transform, context)
         })
     }
 
-    fn ground_bind_groups<'a>(
+    fn ground_uniform<'a>(
         &'a self,
-        device: &'a wgpu::Device,
-    ) -> impl Iterator<Item = wgpu::BindGroup> + 'a {
+        context: &'a WebGl2RenderingContext,
+    ) -> impl Iterator<Item = ()> + 'a {
         self.land.iter().map(move |line| {
             let pos = line.center();
             let direction = line.direction().rot90() * -1.0;
@@ -94,66 +83,80 @@ impl Scene {
                 * Mat3::rotate_y_to(direction)
                 * Mat3::scale(line.len() * 0.52, -1.0);
 
-            self.triangle_bind_group(device, transform)
+            self.triangle_uniform(transform, context)
         })
+    }
+
+    pub fn compile_shader(
+        context: &WebGl2RenderingContext,
+        shader_type: u32,
+        source: &str,
+    ) -> Result<WebGlShader, String> {
+        let shader = context
+            .create_shader(shader_type)
+            .ok_or_else(|| String::from("Unable to create shader object"))?;
+        context.shader_source(&shader, source);
+        context.compile_shader(&shader);
+
+        if context
+            .get_shader_parameter(&shader, WebGl2RenderingContext::COMPILE_STATUS)
+            .as_bool()
+            .unwrap_or(false)
+        {
+            Ok(shader)
+        } else {
+            Err(context
+                .get_shader_info_log(&shader)
+                .unwrap_or_else(|| String::from("Unknown error creating shader")))
+        }
+    }
+
+    pub fn link_program(
+        context: &WebGl2RenderingContext,
+        vert_shader: &WebGlShader,
+        frag_shader: &WebGlShader,
+    ) -> Result<WebGlProgram, String> {
+        let program = context
+            .create_program()
+            .ok_or_else(|| String::from("Unable to create shader object"))?;
+
+        context.attach_shader(&program, vert_shader);
+        context.attach_shader(&program, frag_shader);
+        context.link_program(&program);
+
+        if context
+            .get_program_parameter(&program, WebGl2RenderingContext::LINK_STATUS)
+            .as_bool()
+            .unwrap_or(false)
+        {
+            Ok(program)
+        } else {
+            Err(context
+                .get_program_info_log(&program)
+                .unwrap_or_else(|| String::from("Unknown error creating program object")))
+        }
     }
 }
 impl RenderScene for Scene {
-    fn new_scene(
-        device: &wgpu::Device,
-        _queue: &wgpu::Queue,
-        target_format: wgpu::TextureFormat,
-    ) -> Scene {
-        let shader = device.create_shader_module(&wgpu::ShaderModuleDescriptor {
-            label: None,
-            source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(include_str!("shader.wgsl"))),
-        });
-
-        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: None,
-            entries: &[wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStages::VERTEX,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: wgpu::BufferSize::new(4 * 12),
-                },
-                count: None,
-            }],
-        });
-
-        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: None,
-            bind_group_layouts: &[&bind_group_layout],
-            push_constant_ranges: &[],
-        });
-
-        let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: None,
-            layout: Some(&pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &shader,
-                entry_point: "vs_main",
-                buffers: &[],
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &shader,
-                entry_point: "fs_main",
-                targets: &[target_format.into()],
-            }),
-            primitive: wgpu::PrimitiveState {
-                topology: wgpu::PrimitiveTopology::TriangleList,
-                polygon_mode: wgpu::PolygonMode::Fill,
-                ..wgpu::PrimitiveState::default()
-            },
-            depth_stencil: None,
-            multisample: wgpu::MultisampleState::default(),
-        });
+    fn new_scene(context: &WebGl2RenderingContext) -> Scene {
+        let vert_shader = Self::compile_shader(
+            context,
+            WebGl2RenderingContext::VERTEX_SHADER,
+            include_str!("shader.vert"),
+        )
+        .unwrap();
+        let frag_shader = Self::compile_shader(
+            context,
+            WebGl2RenderingContext::FRAGMENT_SHADER,
+            include_str!("shader.frag"),
+        )
+        .unwrap();
+        let program = Self::link_program(context, &vert_shader, &frag_shader).unwrap();
+        let uniform = context.get_uniform_location(&program, "matrix").unwrap();
 
         Scene {
-            render_pipeline,
-            bind_group_layout,
+            program,
+            uniform,
             camera: Mat3::identity(),
             position: Mat3::identity(),
             throttles: vec![-1],
@@ -161,40 +164,16 @@ impl RenderScene for Scene {
         }
     }
 
-    fn render_one(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, view: &wgpu::TextureView) {
-        let mut encoder =
-            device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
-
+    fn render_one(&mut self, context: &WebGl2RenderingContext) {
+        context.use_program(Some(&self.program));
+        context.clear_color(0.0, 0.0, 0.0, 1.0);
+        context.clear(WebGl2RenderingContext::COLOR_BUFFER_BIT);
+        for _ in self
+            .ship_uniform(context)
+            .chain(self.throttles_uniform(context))
+            .chain(self.ground_uniform(context))
         {
-            let mut triangles = vec![self.ship_bind_group(device)];
-            triangles.extend(self.throttles_bind_group(device));
-            triangles.extend(self.ground_bind_groups(device));
-
-            let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: None,
-                color_attachments: &[wgpu::RenderPassColorAttachment {
-                    view,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                        store: true,
-                    },
-                }],
-                depth_stencil_attachment: None,
-            });
-
-            rpass.set_pipeline(&self.render_pipeline);
-
-            triangles.iter().for_each(|bind| {
-                rpass.set_bind_group(0, &bind, &[]);
-                rpass.draw(0..3, 0..1);
-            });
+            context.draw_arrays(WebGl2RenderingContext::TRIANGLES, 0, 3);
         }
-
-        queue.submit(Some(encoder.finish()));
     }
-}
-
-fn to_u8<T: Copy>(a: &T) -> &[u8] {
-    unsafe { std::slice::from_raw_parts(a as *const T as *const u8, std::mem::size_of::<T>()) }
 }
