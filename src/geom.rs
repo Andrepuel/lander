@@ -204,6 +204,13 @@ impl Mat3 {
             self.1 .2, self.2 .2, 0.0,
         ]
     }
+
+    pub fn as_f32_packed(&self) -> [f32; 9] {
+        [
+            self.0 .0, self.1 .0, self.2 .0, self.0 .1, self.1 .1, self.2 .1, self.0 .2, self.1 .2,
+            self.2 .2,
+        ]
+    }
 }
 impl std::ops::Mul for Mat3 {
     type Output = Mat3;

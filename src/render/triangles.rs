@@ -8,4 +8,7 @@ pub trait TriangleScene<T = TriangleSceneAttr> {
     fn triangles(&self, context: &Self::Context) -> Box<dyn Iterator<Item = Mat3> + '_>;
 }
 
+#[cfg(feature = "wgpu_render")]
 pub type TriangleSceneAttr = super::wgpu::triangles::TriangleScene;
+#[cfg(feature = "webgl")]
+pub type TriangleSceneAttr = super::webgl::triangles::TriangleScene;

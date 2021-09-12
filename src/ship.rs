@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use wasm_bindgen::prelude::wasm_bindgen;
 
 use rand::prelude::Distribution;
 
@@ -7,6 +8,7 @@ use crate::{
     inertia::Inertia,
 };
 
+#[wasm_bindgen]
 #[derive(Debug, Hash, PartialEq, Eq)]
 pub enum Throttle {
     Left,

@@ -65,6 +65,10 @@ impl RenderTarget {
         self.surface.configure(&self.device, &self.sc_desc);
     }
 
+    pub fn get_size(&self) -> (u32, u32) {
+        (self.sc_desc.width, self.sc_desc.height)
+    }
+
     pub fn render_one<R: RenderScene>(&mut self, scene: &mut R, context: &R::Context) {
         let frame = self
             .surface
