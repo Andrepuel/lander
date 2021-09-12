@@ -331,6 +331,7 @@ dependencies = [
  "console_log",
  "getrandom",
  "instant",
+ "js-sys",
  "log",
  "pollster",
  "rand",

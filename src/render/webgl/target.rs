@@ -1,18 +1,18 @@
 use wasm_bindgen::JsCast;
-use web_sys::{HtmlCanvasElement, WebGl2RenderingContext};
+use web_sys::{HtmlCanvasElement, WebGlRenderingContext};
 
 pub struct RenderTarget {
     canvas: HtmlCanvasElement,
-    context: WebGl2RenderingContext,
+    context: WebGlRenderingContext,
 }
 impl RenderTarget {
     pub fn new(canvas: HtmlCanvasElement) -> RenderTarget {
-        let context = canvas
-            .get_context("webgl2")
-            .unwrap()
-            .unwrap()
-            .dyn_into::<WebGl2RenderingContext>()
-            .unwrap();
+        let context = canvas.get_context("webgl").unwrap();
+
+        let context =
+            context.unwrap_or_else(|| canvas.get_context("experimental-webgl").unwrap().unwrap());
+
+        let context = context.dyn_into::<WebGlRenderingContext>().unwrap();
 
         RenderTarget { canvas, context }
     }
@@ -44,6 +44,6 @@ impl RenderTarget {
 pub trait RenderScene {
     type Context;
 
-    fn new_scene(context: &WebGl2RenderingContext) -> Self;
-    fn render_one(&mut self, scene_context: &Self::Context, context: &WebGl2RenderingContext);
+    fn new_scene(context: &WebGlRenderingContext) -> Self;
+    fn render_one(&mut self, scene_context: &Self::Context, context: &WebGlRenderingContext);
 }

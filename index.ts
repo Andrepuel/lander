@@ -14,43 +14,36 @@ async function main() {
     }
     requestAnimationFrame(render);
 
-    function getThrottle(ev: KeyboardEvent | TouchEvent): Throttle | undefined {
+    function getThrottle(ev: KeyboardEvent | TouchEvent, cb: (t: Throttle) => void) {
         if (ev instanceof KeyboardEvent) {
             if (ev.key == 'ArrowUp') {
-                return lander.Throttle.Bottom;
+                cb(lander.Throttle.Bottom);
             } else if (ev.key == 'ArrowLeft') {
-                return lander.Throttle.Left;
+                cb(lander.Throttle.Left);
             } else if (ev.key == 'ArrowRight') {
-                return lander.Throttle.Right;
-            } else {
-                return undefined;
+                cb(lander.Throttle.Right);
             }
         } else if (ev instanceof TouchEvent) {
-            if (ev.changedTouches.length != 1) {
-                return undefined;
+            for (const touch of ev.changedTouches) {
+                const x = touch.pageX / window.innerWidth;
+                const y = touch.pageY / window.innerHeight;
+                if (y < 0.3) {
+                    cb(lander.Throttle.Bottom);
+                } else {
+                    if (x < 0.5) {
+                        cb(lander.Throttle.Left);
+                    } else {
+                        cb(lander.Throttle.Right);
+                    }
+                }
             }
-
-            const x = ev.changedTouches[0].pageX / window.innerWidth;
-            const y = ev.changedTouches[0].pageY / window.innerHeight;
-            console.log({x, y})
-            if (y < 0.3) {
-                return lander.Throttle.Bottom;
-            }
-            if (x < 0.5) {
-                return lander.Throttle.Left;
-            } else {
-                return lander.Throttle.Right;
-            }
-        } else {
-            return undefined;
         }
     }
 
     function control(ev: KeyboardEvent | TouchEvent, down: boolean) {
-        let key = getThrottle(ev);
-        if (key !== undefined) {
+        getThrottle(ev, (key) => {
             world.control(key, down);
-        }
+        });
     }
 
     canvas.addEventListener('touchend', (ev) => {
