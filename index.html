@@ -5,16 +5,33 @@
         <title>Lander</title>
         <script src="dist/main.js"></script>
         <style>
+            html {
+                height: 100%;
+                overflow: hidden;
+            }
             body {
                 margin: 0px;
                 overflow: hidden;
+                height: 100%;
+                position: relative;
+            }
+
+            .noselect {
+                -webkit-touch-callout: none;
+                -webkit-user-select: none;
+                -khtml-user-select: none;
+                -moz-user-select: none;
+                -ms-user-select: none;
+                user-select: none;
             }
         </style>
         <meta name="viewport" 
         content="width=device-width, initial-scale=0.5, maximum-scale=0.5, user-scalable=0">  
     </head>
-    <body>
-        <canvas id='canvas'></canvas>
+    <body class='noselect'>
+        <div class='noselect'>
+            <canvas class='noselect' id='canvas'></canvas>
+        </div>
     </body>
     
 </html>

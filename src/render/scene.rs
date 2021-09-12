@@ -1,5 +1,7 @@
 use rand::prelude::Distribution;
-use web_sys::{WebGl2RenderingContext, WebGlProgram, WebGlShader, WebGlUniformLocation};
+use web_sys::{
+    WebGlBuffer, WebGlProgram, WebGlRenderingContext, WebGlShader, WebGlUniformLocation,
+};
 
 use crate::geom::{Line, Mat3, Point, Vector};
 
@@ -8,6 +10,8 @@ use super::render_target::RenderScene;
 pub struct Scene {
     program: WebGlProgram,
     uniform: WebGlUniformLocation,
+    vertex_buffer: WebGlBuffer,
+    vertex_location: i32,
     camera: Mat3,
     position: Mat3,
     throttles: Vec<i32>,
@@ -36,7 +40,7 @@ impl Scene {
         self.land = land.map(|x| x).collect();
     }
 
-    fn triangle_uniform(&self, transform: Mat3, context: &WebGl2RenderingContext) {
+    fn triangle_uniform(&self, transform: Mat3, context: &WebGlRenderingContext) {
         let transform = self.camera * transform;
         let transform = Mat3::scale_y(-1.0) * transform;
         let data = transform.as_f32_packed();
@@ -45,7 +49,7 @@ impl Scene {
 
     fn ship_uniform<'a>(
         &'a self,
-        context: &'a WebGl2RenderingContext,
+        context: &'a WebGlRenderingContext,
     ) -> impl Iterator<Item = ()> + 'a {
         let transform = self.position * Mat3::scale(3.0, 10.0);
 
@@ -56,7 +60,7 @@ impl Scene {
 
     fn throttles_uniform<'a>(
         &'a self,
-        context: &'a WebGl2RenderingContext,
+        context: &'a WebGlRenderingContext,
     ) -> impl Iterator<Item = ()> + 'a {
         let mut rng = rand::thread_rng();
         let between = rand::distributions::Uniform::from(100..300);
@@ -73,7 +77,7 @@ impl Scene {
 
     fn ground_uniform<'a>(
         &'a self,
-        context: &'a WebGl2RenderingContext,
+        context: &'a WebGlRenderingContext,
     ) -> impl Iterator<Item = ()> + 'a {
         self.land.iter().map(move |line| {
             let pos = line.center();
@@ -88,7 +92,7 @@ impl Scene {
     }
 
     pub fn compile_shader(
-        context: &WebGl2RenderingContext,
+        context: &WebGlRenderingContext,
         shader_type: u32,
         source: &str,
     ) -> Result<WebGlShader, String> {
@@ -99,7 +103,7 @@ impl Scene {
         context.compile_shader(&shader);
 
         if context
-            .get_shader_parameter(&shader, WebGl2RenderingContext::COMPILE_STATUS)
+            .get_shader_parameter(&shader, WebGlRenderingContext::COMPILE_STATUS)
             .as_bool()
             .unwrap_or(false)
         {
@@ -112,7 +116,7 @@ impl Scene {
     }
 
     pub fn link_program(
-        context: &WebGl2RenderingContext,
+        context: &WebGlRenderingContext,
         vert_shader: &WebGlShader,
         frag_shader: &WebGlShader,
     ) -> Result<WebGlProgram, String> {
@@ -125,7 +129,7 @@ impl Scene {
         context.link_program(&program);
 
         if context
-            .get_program_parameter(&program, WebGl2RenderingContext::LINK_STATUS)
+            .get_program_parameter(&program, WebGlRenderingContext::LINK_STATUS)
             .as_bool()
             .unwrap_or(false)
         {
@@ -138,25 +142,46 @@ impl Scene {
     }
 }
 impl RenderScene for Scene {
-    fn new_scene(context: &WebGl2RenderingContext) -> Scene {
+    fn new_scene(context: &WebGlRenderingContext) -> Scene {
         let vert_shader = Self::compile_shader(
             context,
-            WebGl2RenderingContext::VERTEX_SHADER,
+            WebGlRenderingContext::VERTEX_SHADER,
             include_str!("shader.vert"),
         )
         .unwrap();
         let frag_shader = Self::compile_shader(
             context,
-            WebGl2RenderingContext::FRAGMENT_SHADER,
+            WebGlRenderingContext::FRAGMENT_SHADER,
             include_str!("shader.frag"),
         )
         .unwrap();
         let program = Self::link_program(context, &vert_shader, &frag_shader).unwrap();
         let uniform = context.get_uniform_location(&program, "matrix").unwrap();
 
+        let vertex_location = context.get_attrib_location(&program, "a_position");
+        let vertex_buffer = context
+            .create_buffer()
+            .ok_or("Failed to create buffer")
+            .unwrap();
+        context.bind_buffer(WebGlRenderingContext::ARRAY_BUFFER, Some(&vertex_buffer));
+
+        unsafe {
+            let vertices: [f32; 6] = [-1.0, 0.0, 0.0, 1.0, 1.0, 0.0];
+            let positions_array_buf_view = js_sys::Float32Array::view(&vertices);
+
+            context.buffer_data_with_array_buffer_view(
+                WebGlRenderingContext::ARRAY_BUFFER,
+                &positions_array_buf_view,
+                WebGlRenderingContext::STATIC_DRAW,
+            );
+        }
+        context.bind_buffer(WebGlRenderingContext::ARRAY_BUFFER, None);
+
         Scene {
             program,
             uniform,
+            vertex_buffer,
+            vertex_location,
             camera: Mat3::identity(),
             position: Mat3::identity(),
             throttles: vec![-1],
@@ -164,16 +189,31 @@ impl RenderScene for Scene {
         }
     }
 
-    fn render_one(&mut self, context: &WebGl2RenderingContext) {
+    fn render_one(&mut self, context: &WebGlRenderingContext) {
         context.use_program(Some(&self.program));
         context.clear_color(0.0, 0.0, 0.0, 1.0);
-        context.clear(WebGl2RenderingContext::COLOR_BUFFER_BIT);
+        context.clear(WebGlRenderingContext::COLOR_BUFFER_BIT);
+
+        context.bind_buffer(
+            WebGlRenderingContext::ARRAY_BUFFER,
+            Some(&self.vertex_buffer),
+        );
+        context.vertex_attrib_pointer_with_i32(
+            self.vertex_location as u32,
+            2,
+            WebGlRenderingContext::FLOAT,
+            false,
+            0,
+            0,
+        );
+        context.enable_vertex_attrib_array(self.vertex_location as u32);
+
         for _ in self
             .ship_uniform(context)
             .chain(self.throttles_uniform(context))
             .chain(self.ground_uniform(context))
         {
-            context.draw_arrays(WebGl2RenderingContext::TRIANGLES, 0, 3);
+            context.draw_arrays(WebGlRenderingContext::TRIANGLES, 0, 3);
         }
     }
 }
