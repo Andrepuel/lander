@@ -1,7 +1,7 @@
 Lander
 ======
 
-Lander mini game implemented using Rust and WebGPU.
+Lander mini game implemented using Rust and WebGPU. [Online demo](https://andrepuel.github.io/lander/).
 
 ![image Screenshot](./readme/ss.png)
 
