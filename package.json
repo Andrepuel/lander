@@ -1,0 +1,36 @@
+{
+  "name": "lander",
+  "version": "1.0.0",
+  "description": "lander",
+  "main": "index.js",
+  "scripts": {
+    "build:wasm:dev": "wasm-pack build --debug",
+    "build:wasm": "wasm-pack build",
+    "build:tsc": "tsc",
+    "build": "npm run build:wasm && npm run build:tsc && npm run build:prod",
+    "build:dev": "npm run build:wasm:dev && npm run build:tsc && webpack --mode=development",
+    "build:prod": "webpack --mode=production --node-env=production",
+    "watch": "webpack --watch"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Andrepuel/lander.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Andrepuel/lander/issues"
+  },
+  "homepage": "https://github.com/Andrepuel/lander#readme",
+  "dependencies": {
+    "lander": "file:./pkg"
+  },
+  "devDependencies": {
+    "@webpack-cli/generators": "^2.3.0",
+    "prettier": "^2.4.0",
+    "ts-loader": "^9.2.5",
+    "typescript": "^4.4.3",
+    "webpack": "^5.52.1",
+    "webpack-cli": "^4.8.0"
+  }
+}

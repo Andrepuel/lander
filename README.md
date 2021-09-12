@@ -13,3 +13,9 @@ Controls
  * Up arrow key - activates central booster
 
 Steer the space ship by using the lateral boosters to change the direction the ship is pointing. Use the central booster to move forward.
+
+Wasm Compilation
+----------------
+Run the NPM scripts to invoke the build:
+
+    npm run build:dev
