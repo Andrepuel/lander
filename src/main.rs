@@ -84,7 +84,7 @@ fn main() {
                 scene.set_zoom(zoom);
                 scene.set_window_size(window_size.width, window_size.height);
                 scene.set_land(land.all());
-                target.render_one(&mut scene);
+                target.render_one(&mut scene, &());
             }
             Event::WindowEvent {
                 event: WindowEvent::CloseRequested,
