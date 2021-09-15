@@ -1,19 +1,21 @@
 use raw_window_handle::HasRawWindowHandle;
 use wgpu::TextureViewDescriptor;
 
-pub struct RenderTarget {
+use crate::render::render_target::{self, RenderScene};
+
+pub struct WgpuRenderTarget {
     device: wgpu::Device,
     sc_desc: wgpu::SurfaceConfiguration,
     swapchain_format: wgpu::TextureFormat,
     queue: wgpu::Queue,
     surface: wgpu::Surface,
 }
-impl RenderTarget {
-    pub fn new<T: HasRawWindowHandle>(window: &T) -> RenderTarget {
+impl WgpuRenderTarget {
+    pub fn new<T: HasRawWindowHandle>(window: &T) -> WgpuRenderTarget {
         pollster::block_on(Self::new_async(window))
     }
 
-    pub async fn new_async<T: HasRawWindowHandle>(window: &T) -> RenderTarget {
+    pub async fn new_async<T: HasRawWindowHandle>(window: &T) -> WgpuRenderTarget {
         let instance = wgpu::Instance::new(wgpu::Backends::all());
         let size = (1, 1);
         let surface = unsafe { instance.create_surface(window) };
@@ -50,7 +52,7 @@ impl RenderTarget {
 
         surface.configure(&device, &sc_desc);
 
-        RenderTarget {
+        WgpuRenderTarget {
             device,
             sc_desc,
             swapchain_format,
@@ -59,17 +61,28 @@ impl RenderTarget {
         }
     }
 
-    pub fn resize(&mut self, width: u32, height: u32) {
+    pub fn get_init(&self) -> (&wgpu::Device, &wgpu::Queue, wgpu::TextureFormat) {
+        (&self.device, &self.queue, self.swapchain_format)
+    }
+}
+impl render_target::RenderTarget for WgpuRenderTarget {
+    type RenderContext = wgpu::TextureView;
+
+    fn resize(&mut self, width: u32, height: u32) {
         self.sc_desc.width = width;
         self.sc_desc.height = height;
         self.surface.configure(&self.device, &self.sc_desc);
     }
 
-    pub fn get_size(&self) -> (u32, u32) {
+    fn get_size(&self) -> (u32, u32) {
         (self.sc_desc.width, self.sc_desc.height)
     }
 
-    pub fn render_one<R: RenderScene>(&mut self, scene: &mut R, context: &R::Context) {
+    fn new_scene<R: RenderScene<Self>>(&mut self) -> R {
+        R::new_scene(self)
+    }
+
+    fn render_one<R: RenderScene<Self>>(&mut self, scene: &mut R, context: &R::Context) {
         let frame = self
             .surface
             .get_current_frame()
@@ -78,31 +91,8 @@ impl RenderTarget {
 
         scene.render_one(
             context,
-            &self.device,
-            &self.queue,
+            &self,
             &frame.texture.create_view(&TextureViewDescriptor::default()),
         );
     }
-
-    pub fn new_scene<R: RenderScene>(&mut self) -> R {
-        R::new_scene(&self.device, &self.queue, self.swapchain_format)
-    }
-}
-
-pub trait RenderScene {
-    type Context;
-
-    fn new_scene(
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
-        target_format: wgpu::TextureFormat,
-    ) -> Self;
-
-    fn render_one(
-        &mut self,
-        context: &Self::Context,
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
-        view: &wgpu::TextureView,
-    );
 }

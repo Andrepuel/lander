@@ -2,9 +2,12 @@ use web_sys::{
     WebGlBuffer, WebGlProgram, WebGlRenderingContext, WebGlShader, WebGlUniformLocation,
 };
 
-use crate::{geom::Mat3, render::triangles};
+use crate::{
+    geom::Mat3,
+    render::{render_target::RenderScene, triangles},
+};
 
-use super::target::RenderScene;
+use super::target::WebglRenderTarget;
 
 pub struct TriangleScene {
     program: WebGlProgram,
@@ -141,17 +144,20 @@ impl TriangleScene {
         }
     }
 }
-impl<T: triangles::TriangleScene<TriangleScene>> RenderScene for T {
+impl<T: triangles::TriangleScene<Attribute = TriangleScene>> RenderScene<WebglRenderTarget> for T {
     type Context = T::Context;
 
-    fn new_scene(context: &WebGlRenderingContext) -> Self {
-        <Self as triangles::TriangleScene<TriangleScene>>::new_scene(TriangleScene::new_scene(
-            context,
-        ))
+    fn new_scene(target: &mut WebglRenderTarget) -> Self {
+        Self::from_attr(TriangleScene::new_scene(target.get_context()))
     }
 
-    fn render_one(&mut self, scene_context: &Self::Context, context: &WebGlRenderingContext) {
+    fn render_one(
+        &mut self,
+        scene_context: &Self::Context,
+        _target: &WebglRenderTarget,
+        context: &WebGlRenderingContext,
+    ) {
         let triangles = self.triangles(scene_context);
-        self.attr_pipeline().render_one(triangles, context);
+        self.attr().render_one(triangles, context);
     }
 }

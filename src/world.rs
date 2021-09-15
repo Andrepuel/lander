@@ -1,9 +1,11 @@
 use instant::{Duration, Instant};
-use wasm_bindgen::prelude::wasm_bindgen;
 
 use crate::{
     inertia::Inertia,
-    render::{render_target::RenderTarget, scene::Scene},
+    render::{
+        render_target::{RenderScene, RenderTarget},
+        scene::Scene,
+    },
     ship::{Land, Ship, Throttle},
 };
 
@@ -31,18 +33,25 @@ impl IntegrationController {
     }
 }
 
-#[wasm_bindgen]
-pub struct World {
-    target: RenderTarget,
-    scene: Scene,
+pub struct World<T, Attr>
+where
+    T: RenderTarget,
+    Scene<Attr>: RenderScene<T>,
+{
+    target: T,
+    scene: Scene<Attr>,
     ship: Ship,
     land: Land,
     integration: IntegrationController,
     prev_zoom: f32,
 }
-impl From<RenderTarget> for World {
-    fn from(mut target: RenderTarget) -> Self {
-        let scene: Scene = target.new_scene();
+impl<T, Attr> From<T> for World<T, Attr>
+where
+    T: RenderTarget,
+    Scene<Attr>: RenderScene<T>,
+{
+    fn from(mut target: T) -> Self {
+        let scene = target.new_scene();
 
         World {
             target,
@@ -55,21 +64,21 @@ impl From<RenderTarget> for World {
     }
 }
 #[cfg(feature = "wgpu_render")]
-impl<T: raw_window_handle::HasRawWindowHandle> From<&T> for World {
+impl<T: raw_window_handle::HasRawWindowHandle> From<&T>
+    for World<
+        crate::render::wgpu::target::WgpuRenderTarget,
+        crate::render::wgpu::triangles::TriangleScene,
+    >
+{
     fn from(window: &T) -> Self {
-        RenderTarget::new(window).into()
+        crate::render::wgpu::target::WgpuRenderTarget::new(window).into()
     }
 }
-#[wasm_bindgen]
-impl World {
-    #[cfg(feature = "webgl")]
-    #[wasm_bindgen(constructor)]
-    pub fn new(canvas: web_sys::HtmlCanvasElement) -> Result<World, wasm_bindgen::JsValue> {
-        let target = RenderTarget::new(canvas);
-
-        Ok(target.into())
-    }
-
+impl<T, Attr> World<T, Attr>
+where
+    T: RenderTarget,
+    Scene<Attr>: RenderScene<T, Context = ()>,
+{
     pub fn resize(&mut self, width: u32, height: u32) {
         self.target.resize(width, height);
     }

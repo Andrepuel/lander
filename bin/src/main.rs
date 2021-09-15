@@ -1,6 +1,6 @@
 use std::time::{Duration, Instant};
 
-use lander::{ship::Throttle, World};
+use lander::{ship::Throttle, world::World};
 use winit::{
     dpi::PhysicalSize,
     event::{DeviceEvent, Event, KeyboardInput, WindowEvent},

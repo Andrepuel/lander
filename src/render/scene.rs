@@ -1,15 +1,18 @@
-use super::triangles::{TriangleScene, TriangleSceneAttr};
-use crate::geom::{Line, Mat3, Point, Vector};
+use super::triangles::TriangleScene;
+use crate::{
+    attribute::Attribute,
+    geom::{Line, Mat3, Point, Vector},
+};
 use rand::prelude::Distribution;
 
-pub struct Scene {
-    attr_pipeline: TriangleSceneAttr,
+pub struct Scene<Attr> {
+    attr: Attr,
     camera: Mat3,
     position: Mat3,
     throttles: Vec<i32>,
     land: Vec<Line>,
 }
-impl Scene {
+impl<Attr> Scene<Attr> {
     pub fn set_position(&mut self, bottom: Point, direction: Vector) {
         self.position = Mat3::translate(bottom.0, bottom.1) * Mat3::rotate_y_to(direction);
         self.camera = Mat3::translate(-bottom.0, -bottom.1);
@@ -64,12 +67,12 @@ impl Scene {
         })
     }
 }
-impl TriangleScene for Scene {
-    type Context = ();
+impl<Attr> Attribute for Scene<Attr> {
+    type Attribute = Attr;
 
-    fn new_scene(attr_pipeline: TriangleSceneAttr) -> Self {
+    fn from_attr(attr: Self::Attribute) -> Self {
         Scene {
-            attr_pipeline,
+            attr,
             camera: Mat3::identity(),
             position: Mat3::identity(),
             throttles: vec![-1],
@@ -77,9 +80,12 @@ impl TriangleScene for Scene {
         }
     }
 
-    fn attr_pipeline(&self) -> &TriangleSceneAttr {
-        &self.attr_pipeline
+    fn attr(&self) -> &Self::Attribute {
+        &self.attr
     }
+}
+impl<Attr> TriangleScene for Scene<Attr> {
+    type Context = ();
 
     fn triangles(&self, _context: &Self::Context) -> Box<dyn Iterator<Item = Mat3> + '_> {
         let r = (0..1)

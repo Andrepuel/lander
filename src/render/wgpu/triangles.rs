@@ -2,9 +2,12 @@ use std::borrow::Cow;
 
 use wgpu::util::DeviceExt;
 
-use crate::{geom::Mat3, render::triangles};
+use crate::{
+    geom::Mat3,
+    render::{render_target::RenderScene, triangles},
+};
 
-use super::target::RenderScene;
+use super::target::WgpuRenderTarget;
 
 pub struct TriangleScene {
     render_pipeline: wgpu::RenderPipeline,
@@ -127,31 +130,23 @@ impl TriangleScene {
         bind_group
     }
 }
-impl<T: triangles::TriangleScene<TriangleScene>> RenderScene for T {
+impl<T: triangles::TriangleScene<Attribute = TriangleScene>> RenderScene<WgpuRenderTarget> for T {
     type Context = T::Context;
 
-    fn new_scene(
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
-        target_format: wgpu::TextureFormat,
-    ) -> Self {
-        <Self as triangles::TriangleScene<TriangleScene>>::new_scene(TriangleScene::new_scene(
-            device,
-            queue,
-            target_format,
-        ))
+    fn new_scene(target: &mut WgpuRenderTarget) -> Self {
+        let (device, queue, target_format) = target.get_init();
+        Self::from_attr(TriangleScene::new_scene(device, queue, target_format))
     }
 
     fn render_one(
         &mut self,
-        context: &Self::Context,
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
+        scene_context: &Self::Context,
+        target: &WgpuRenderTarget,
         view: &wgpu::TextureView,
     ) {
-        let triangles = self.triangles(context);
-        self.attr_pipeline()
-            .render_one(triangles, device, queue, view);
+        let (device, queue, _) = target.get_init();
+        let triangles = self.triangles(scene_context);
+        self.attr().render_one(triangles, device, queue, view);
     }
 }
 
