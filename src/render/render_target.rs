@@ -1,29 +1,24 @@
+use std::ops::DerefMut;
+
+use crate::geom::Mat3;
+
 pub trait RenderTarget {
-    type RenderContext;
+    type RenderScene<T: RenderScene>: DerefMut<Target = T>;
 
     fn resize(&mut self, width: u32, height: u32);
     fn get_size(&self) -> (u32, u32);
 
-    fn new_scene<R>(&mut self) -> R
+    fn new_scene<R>(&mut self, scene: R) -> Self::RenderScene<R>
     where
-        R: RenderScene<Self>;
+        R: RenderScene;
 
-    fn render_one<R>(&mut self, scene: &mut R, context: &R::Context)
+    fn render_one<R>(&mut self, scene: &mut Self::RenderScene<R>, context: R::Context<'_>)
     where
-        R: RenderScene<Self>;
+        R: RenderScene;
 }
 
-pub trait RenderScene<T: RenderTarget + ?Sized>
-where
-    Self: Sized,
-{
-    type Context;
+pub trait RenderScene {
+    type Context<'a>;
 
-    fn new_scene(target_context: &mut T) -> Self;
-    fn render_one(
-        &mut self,
-        scene_context: &Self::Context,
-        target_context: &T,
-        render_context: &T::RenderContext,
-    );
+    fn triangles(&self, context: Self::Context<'_>) -> Box<dyn Iterator<Item = Mat3> + '_>;
 }

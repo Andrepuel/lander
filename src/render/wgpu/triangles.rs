@@ -1,20 +1,20 @@
-use std::borrow::Cow;
+use std::{
+    borrow::Cow,
+    ops::{Deref, DerefMut},
+};
 
 use wgpu::util::DeviceExt;
 
-use crate::{
-    geom::Mat3,
-    render::{render_target::RenderScene, triangles},
-};
+use crate::{geom::Mat3, render::render_target::RenderScene};
 
-use super::target::WgpuRenderTarget;
-
-pub struct TriangleScene {
+pub struct TriangleScene<T: RenderScene> {
     render_pipeline: wgpu::RenderPipeline,
     bind_group_layout: wgpu::BindGroupLayout,
+    scene: T,
 }
-impl TriangleScene {
-    fn new_scene(
+impl<T: RenderScene> TriangleScene<T> {
+    pub fn new(
+        scene: T,
         device: &wgpu::Device,
         _queue: &wgpu::Queue,
         target_format: wgpu::TextureFormat,
@@ -69,12 +69,13 @@ impl TriangleScene {
         Self {
             render_pipeline,
             bind_group_layout,
+            scene,
         }
     }
 
-    fn render_one<'a>(
+    pub fn render_one<'a>(
         &self,
-        triangles: Box<dyn Iterator<Item = Mat3> + 'a>,
+        scene_context: T::Context<'_>,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         view: &wgpu::TextureView,
@@ -83,7 +84,9 @@ impl TriangleScene {
             device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
 
         {
-            let triangles: Vec<_> = triangles
+            let triangles: Vec<_> = self
+                .scene
+                .triangles(scene_context)
                 .map(|transform| self.triangle_bind_group(device, transform))
                 .collect();
 
@@ -130,23 +133,17 @@ impl TriangleScene {
         bind_group
     }
 }
-impl<T: triangles::TriangleScene<Attribute = TriangleScene>> RenderScene<WgpuRenderTarget> for T {
-    type Context = T::Context;
 
-    fn new_scene(target: &mut WgpuRenderTarget) -> Self {
-        let (device, queue, target_format) = target.get_init();
-        Self::from_attr(TriangleScene::new_scene(device, queue, target_format))
+impl<T: RenderScene> Deref for TriangleScene<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.scene
     }
-
-    fn render_one(
-        &mut self,
-        scene_context: &Self::Context,
-        target: &WgpuRenderTarget,
-        view: &wgpu::TextureView,
-    ) {
-        let (device, queue, _) = target.get_init();
-        let triangles = self.triangles(scene_context);
-        self.attr().render_one(triangles, device, queue, view);
+}
+impl<T: RenderScene> DerefMut for TriangleScene<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.scene
     }
 }
 

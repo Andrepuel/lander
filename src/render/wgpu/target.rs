@@ -1,7 +1,9 @@
 use raw_window_handle::HasRawWindowHandle;
 use wgpu::TextureViewDescriptor;
 
-use crate::render::render_target::{self, RenderScene};
+use crate::render::render_target::{RenderScene, RenderTarget};
+
+use super::triangles::TriangleScene;
 
 pub struct WgpuRenderTarget {
     device: wgpu::Device,
@@ -65,8 +67,8 @@ impl WgpuRenderTarget {
         (&self.device, &self.queue, self.swapchain_format)
     }
 }
-impl render_target::RenderTarget for WgpuRenderTarget {
-    type RenderContext = wgpu::TextureView;
+impl RenderTarget for WgpuRenderTarget {
+    type RenderScene<T: RenderScene> = TriangleScene<T>;
 
     fn resize(&mut self, width: u32, height: u32) {
         self.sc_desc.width = width;
@@ -78,11 +80,15 @@ impl render_target::RenderTarget for WgpuRenderTarget {
         (self.sc_desc.width, self.sc_desc.height)
     }
 
-    fn new_scene<R: RenderScene<Self>>(&mut self) -> R {
-        R::new_scene(self)
+    fn new_scene<R: RenderScene>(&mut self, scene: R) -> TriangleScene<R> {
+        TriangleScene::new(scene, &self.device, &self.queue, self.swapchain_format)
     }
 
-    fn render_one<R: RenderScene<Self>>(&mut self, scene: &mut R, context: &R::Context) {
+    fn render_one<R: RenderScene>(
+        &mut self,
+        scene: &mut TriangleScene<R>,
+        context: R::Context<'_>,
+    ) {
         let frame = self
             .surface
             .get_current_frame()
@@ -91,7 +97,8 @@ impl render_target::RenderTarget for WgpuRenderTarget {
 
         scene.render_one(
             context,
-            &self,
+            &self.device,
+            &self.queue,
             &frame.texture.create_view(&TextureViewDescriptor::default()),
         );
     }

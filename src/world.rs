@@ -2,10 +2,7 @@ use instant::{Duration, Instant};
 
 use crate::{
     inertia::Inertia,
-    render::{
-        render_target::{RenderScene, RenderTarget},
-        scene::Scene,
-    },
+    render::{render_target::RenderTarget, scene::Scene},
     ship::{Land, Ship, Throttle},
 };
 
@@ -33,25 +30,23 @@ impl IntegrationController {
     }
 }
 
-pub struct World<T, Attr>
+pub struct World<T>
 where
     T: RenderTarget,
-    Scene<Attr>: RenderScene<T>,
 {
     target: T,
-    scene: Scene<Attr>,
+    scene: T::RenderScene<Scene>,
     ship: Ship,
     land: Land,
     integration: IntegrationController,
     prev_zoom: f32,
 }
-impl<T, Attr> From<T> for World<T, Attr>
+impl<T> From<T> for World<T>
 where
     T: RenderTarget,
-    Scene<Attr>: RenderScene<T>,
 {
     fn from(mut target: T) -> Self {
-        let scene = target.new_scene();
+        let scene = target.new_scene(Scene::new());
 
         World {
             target,
@@ -65,19 +60,15 @@ where
 }
 #[cfg(feature = "wgpu_render")]
 impl<T: raw_window_handle::HasRawWindowHandle> From<&T>
-    for World<
-        crate::render::wgpu::target::WgpuRenderTarget,
-        crate::render::wgpu::triangles::TriangleScene,
-    >
+    for World<crate::render::wgpu::target::WgpuRenderTarget>
 {
     fn from(window: &T) -> Self {
         crate::render::wgpu::target::WgpuRenderTarget::new(window).into()
     }
 }
-impl<T, Attr> World<T, Attr>
+impl<T> World<T>
 where
     T: RenderTarget,
-    Scene<Attr>: RenderScene<T, Context = ()>,
 {
     pub fn resize(&mut self, width: u32, height: u32) {
         self.target.resize(width, height);

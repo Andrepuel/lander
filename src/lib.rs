@@ -1,4 +1,5 @@
-pub mod attribute;
+#![feature(generic_associated_types)]
+
 pub mod geom;
 pub mod inertia;
 pub mod render;
@@ -17,9 +18,7 @@ pub fn load() {
 
 #[cfg(feature = "webgl")]
 #[wasm_bindgen]
-pub struct World(
-    world::World<render::webgl::target::WebglRenderTarget, render::webgl::triangles::TriangleScene>,
-);
+pub struct World(world::World<render::webgl::target::WebglRenderTarget>);
 #[cfg(feature = "webgl")]
 #[wasm_bindgen]
 impl World {

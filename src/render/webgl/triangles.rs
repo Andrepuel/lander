@@ -1,22 +1,20 @@
+use std::ops::{Deref, DerefMut};
+
 use web_sys::{
     WebGlBuffer, WebGlProgram, WebGlRenderingContext, WebGlShader, WebGlUniformLocation,
 };
 
-use crate::{
-    geom::Mat3,
-    render::{render_target::RenderScene, triangles},
-};
+use crate::{geom::Mat3, render::render_target::RenderScene};
 
-use super::target::WebglRenderTarget;
-
-pub struct TriangleScene {
+pub struct TriangleScene<T: RenderScene> {
     program: WebGlProgram,
     uniform: WebGlUniformLocation,
     vertex_buffer: WebGlBuffer,
     vertex_location: i32,
+    scene: T,
 }
-impl TriangleScene {
-    fn new_scene(context: &WebGlRenderingContext) -> TriangleScene {
+impl<T: RenderScene> TriangleScene<T> {
+    pub fn new(scene: T, context: &WebGlRenderingContext) -> Self {
         let vert_shader = Self::compile_shader(
             context,
             WebGlRenderingContext::VERTEX_SHADER,
@@ -56,6 +54,7 @@ impl TriangleScene {
             uniform,
             vertex_buffer,
             vertex_location,
+            scene,
         }
     }
 
@@ -65,11 +64,7 @@ impl TriangleScene {
         context.uniform_matrix3fv_with_f32_array(Some(&self.uniform), false, &data);
     }
 
-    fn render_one<'a>(
-        &self,
-        triangles: Box<dyn Iterator<Item = Mat3> + 'a>,
-        context: &WebGlRenderingContext,
-    ) {
+    pub fn render_one(&self, scene_context: T::Context<'_>, context: &WebGlRenderingContext) {
         context.use_program(Some(&self.program));
         context.clear_color(0.0, 0.0, 0.0, 1.0);
         context.clear(WebGlRenderingContext::COLOR_BUFFER_BIT);
@@ -88,7 +83,7 @@ impl TriangleScene {
         );
         context.enable_vertex_attrib_array(self.vertex_location as u32);
 
-        for triangle in triangles {
+        for triangle in self.scene.triangles(scene_context) {
             self.triangle_uniform(triangle, context);
             context.draw_arrays(WebGlRenderingContext::TRIANGLES, 0, 3);
         }
@@ -144,20 +139,15 @@ impl TriangleScene {
         }
     }
 }
-impl<T: triangles::TriangleScene<Attribute = TriangleScene>> RenderScene<WebglRenderTarget> for T {
-    type Context = T::Context;
+impl<T: RenderScene> Deref for TriangleScene<T> {
+    type Target = T;
 
-    fn new_scene(target: &mut WebglRenderTarget) -> Self {
-        Self::from_attr(TriangleScene::new_scene(target.get_context()))
+    fn deref(&self) -> &Self::Target {
+        &self.scene
     }
-
-    fn render_one(
-        &mut self,
-        scene_context: &Self::Context,
-        _target: &WebglRenderTarget,
-        context: &WebGlRenderingContext,
-    ) {
-        let triangles = self.triangles(scene_context);
-        self.attr().render_one(triangles, context);
+}
+impl<T: RenderScene> DerefMut for TriangleScene<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.scene
     }
 }
