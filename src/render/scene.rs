@@ -21,8 +21,9 @@ impl Scene {
 }
 impl RenderScene for Scene {
     type Context<'a> = &'a mut [&'a mut dyn Drawable];
+    type Triangles<'a> = impl Iterator<Item = Mat3> + 'a;
 
-    fn triangles<'a>(&'a self, context: Self::Context<'a>) -> Box<dyn Iterator<Item = Mat3> + 'a> {
+    fn triangles<'a>(&'a self, context: Self::Context<'a>) -> Self::Triangles<'a> {
         let r = context
             .into_iter()
             .map(move |drawable| {

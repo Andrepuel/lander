@@ -22,6 +22,7 @@ pub trait RenderTarget {
 
 pub trait RenderScene {
     type Context<'a>;
+    type Triangles<'a>: Iterator<Item = Mat3> + 'a;
 
-    fn triangles<'a>(&'a self, context: Self::Context<'a>) -> Box<dyn Iterator<Item = Mat3> + 'a>;
+    fn triangles<'a>(&'a self, context: Self::Context<'a>) -> Self::Triangles<'a>;
 }
