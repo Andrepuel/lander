@@ -1,11 +1,12 @@
-use std::collections::HashSet;
+use std::{array, collections::HashSet};
 use wasm_bindgen::prelude::wasm_bindgen;
 
 use rand::prelude::Distribution;
 
 use crate::{
-    geom::{Line, Point, Vector},
+    geom::{Line, Mat3, Point, Vector},
     inertia::Inertia,
+    render::scene::Drawable,
 };
 
 #[wasm_bindgen]
@@ -109,16 +110,45 @@ impl Ship {
         }
     }
 
-    pub fn active_throttles(&self) -> Vec<i32> {
-        [
-            (Throttle::Left, -1),
-            (Throttle::Bottom, 0),
-            (Throttle::Right, 1),
-        ]
-        .iter()
-        .filter(|(x, _)| self.throttle.contains(x))
-        .map(|(_, pos)| *pos)
-        .collect()
+    pub fn drawable(&self) -> impl Drawable + '_ {
+        ShipDrawable(self, Some(Mat3::scale(3.0, 10.0)).into_iter())
+    }
+
+    pub fn active_throttles(&self) -> impl Drawable + '_ {
+        let triangles = [
+            self.throttle_drawing(Throttle::Left),
+            self.throttle_drawing(Throttle::Bottom),
+            self.throttle_drawing(Throttle::Right),
+        ];
+
+        ShipDrawable(self, array::IntoIter::new(triangles))
+    }
+
+    fn throttle_drawing(&self, thruster: Throttle) -> Mat3 {
+        let size = if self.throttle.contains(&thruster) {
+            let mut rng = rand::thread_rng();
+            let between = rand::distributions::Uniform::from(100..300);
+            (between.sample(&mut rng) as f32) / 100.0
+        } else {
+            0.0
+        };
+
+        let pos = (thruster as i32) - 1;
+
+        Mat3::translate((pos as f32) * 3.0, 0.0) * Mat3::scale(0.5, -size)
+    }
+}
+
+pub struct ShipDrawable<'a, T: Iterator<Item = Mat3>>(&'a Ship, T);
+impl<'a, T: Iterator<Item = Mat3>> Drawable for ShipDrawable<'a, T> {
+    fn position(&self) -> crate::geom::Mat3 {
+        let origin = self.0.origin();
+
+        Mat3::translate(origin.0, origin.1) * Mat3::rotate_y_to(self.0.direction())
+    }
+
+    fn triangles<'b>(&'b mut self) -> &'b mut (dyn Iterator<Item = Mat3> + 'b) {
+        &mut self.1
     }
 }
 
@@ -157,6 +187,19 @@ impl Land {
 
     pub fn all(&self) -> impl Iterator<Item = Line> + '_ {
         (1..self.heights.len()).map(move |idx| Line(self.heights[idx - 1], self.heights[idx]))
+    }
+
+    pub fn drawable(&self) -> impl Iterator<Item = Mat3> + '_ {
+        self.all().map(|line| {
+            let pos = line.center();
+            let direction = line.direction().rot90() * -1.0;
+
+            let transform = Mat3::translate(pos.0, pos.1)
+                * Mat3::rotate_y_to(direction)
+                * Mat3::scale(line.len() * 0.52, -1.0);
+
+            transform
+        })
     }
 
     fn expand_min(&mut self, min: f32) {

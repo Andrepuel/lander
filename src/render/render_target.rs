@@ -12,13 +12,16 @@ pub trait RenderTarget {
     where
         R: RenderScene;
 
-    fn render_one<R>(&mut self, scene: &mut Self::RenderScene<R>, context: R::Context<'_>)
-    where
+    fn render_one<'a, R>(
+        &'a mut self,
+        scene: &'a mut Self::RenderScene<R>,
+        context: R::Context<'a>,
+    ) where
         R: RenderScene;
 }
 
 pub trait RenderScene {
     type Context<'a>;
 
-    fn triangles(&self, context: Self::Context<'_>) -> Box<dyn Iterator<Item = Mat3> + '_>;
+    fn triangles<'a>(&'a self, context: Self::Context<'a>) -> Box<dyn Iterator<Item = Mat3> + 'a>;
 }

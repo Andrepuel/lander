@@ -84,10 +84,10 @@ impl RenderTarget for WgpuRenderTarget {
         TriangleScene::new(scene, &self.device, &self.queue, self.swapchain_format)
     }
 
-    fn render_one<R: RenderScene>(
-        &mut self,
-        scene: &mut TriangleScene<R>,
-        context: R::Context<'_>,
+    fn render_one<'a, R: RenderScene>(
+        &'a mut self,
+        scene: &'a mut TriangleScene<R>,
+        context: R::Context<'a>,
     ) {
         let frame = self
             .surface

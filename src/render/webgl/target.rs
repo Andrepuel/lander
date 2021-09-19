@@ -44,8 +44,11 @@ impl RenderTarget for WebglRenderTarget {
         TriangleScene::new(scene, &self.context)
     }
 
-    fn render_one<R>(&mut self, scene: &mut TriangleScene<R>, scene_context: R::Context<'_>)
-    where
+    fn render_one<'a, R>(
+        &'a mut self,
+        scene: &'a mut TriangleScene<R>,
+        scene_context: R::Context<'a>,
+    ) where
         R: RenderScene,
     {
         self.context.viewport(

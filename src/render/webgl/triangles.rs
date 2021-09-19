@@ -64,7 +64,11 @@ impl<T: RenderScene> TriangleScene<T> {
         context.uniform_matrix3fv_with_f32_array(Some(&self.uniform), false, &data);
     }
 
-    pub fn render_one(&self, scene_context: T::Context<'_>, context: &WebGlRenderingContext) {
+    pub fn render_one<'a>(
+        &'a self,
+        scene_context: T::Context<'a>,
+        context: &WebGlRenderingContext,
+    ) {
         context.use_program(Some(&self.program));
         context.clear_color(0.0, 0.0, 0.0, 1.0);
         context.clear(WebGlRenderingContext::COLOR_BUFFER_BIT);

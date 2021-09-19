@@ -74,8 +74,8 @@ impl<T: RenderScene> TriangleScene<T> {
     }
 
     pub fn render_one<'a>(
-        &self,
-        scene_context: T::Context<'_>,
+        &'a self,
+        scene_context: T::Context<'a>,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         view: &wgpu::TextureView,
